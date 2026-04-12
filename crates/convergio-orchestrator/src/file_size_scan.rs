@@ -48,6 +48,10 @@ async fn handle_size_check(
     Json(req): Json<ScanRequest>,
 ) -> Json<serde_json::Value> {
     let root = Path::new(&req.path);
+    // Block path traversal: reject absolute paths and `..` components
+    if root.is_absolute() || req.path.contains("..") {
+        return Json(json!({"error": "path must be relative and cannot contain '..'"}));
+    }
     if !root.exists() {
         return Json(json!({"error": format!("path '{}' not found", req.path)}));
     }

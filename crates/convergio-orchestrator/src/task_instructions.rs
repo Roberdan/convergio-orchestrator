@@ -92,7 +92,7 @@ pub fn build(
         "## Completion\n\n\
          When done, call the daemon API to submit:\n\
          ```bash\n\
-         curl -X POST -H 'Authorization: Bearer '\"${{CONVERGIO_AUTH_TOKEN:-dev-local}}\" \\\n\
+         curl -X POST -H 'Authorization: Bearer '\"${{CONVERGIO_AUTH_TOKEN:?must be set}}\" \\\n\
            -H 'Content-Type: application/json' \\\n\
            http://localhost:8420/api/plan-db/task/complete-flow \\\n\
            -d '{{\"task_db_id\": {db_id}, \"agent_id\": \"$CONVERGIO_AGENT_ID\", \
@@ -183,9 +183,8 @@ pub async fn enrich_with_knowledge(instructions: &str, task_description: &str) -
     }));
     if let Ok(t) = std::env::var("CONVERGIO_AUTH_TOKEN") {
         req = req.bearer_auth(t);
-    } else {
-        req = req.bearer_auth("dev-local");
     }
+    // No fallback token — fail closed if CONVERGIO_AUTH_TOKEN is not set
 
     let resp = match req.send().await {
         Ok(r) => r,

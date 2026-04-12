@@ -4,6 +4,7 @@ description = "Plans, tasks, waves, Thor gate, reaper — orchestration engine"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 convergio-types = { workspace = true }

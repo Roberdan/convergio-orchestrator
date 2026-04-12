@@ -16,6 +16,21 @@ use tokio_util::io::ReaderStream;
 
 use crate::artifacts;
 
+/// Strip path separators and traversal components from a user-supplied filename.
+fn sanitize_filename(raw: &str) -> String {
+    let name = raw
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(raw)
+        .replace("..", "");
+    // Keep only safe characters: alphanumeric, dash, underscore, dot
+    name.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .collect::<String>()
+        .trim_start_matches('.')
+        .to_string()
+}
+
 /// Base directory for artifact file storage.
 fn artifacts_dir() -> PathBuf {
     PathBuf::from(
@@ -77,7 +92,16 @@ async fn handle_upload(
 
     let display_name =
         name.unwrap_or_else(|| file_name.clone().unwrap_or_else(|| "unnamed".to_string()));
-    let safe_file = file_name.unwrap_or_else(|| display_name.clone());
+    let raw_file = file_name.unwrap_or_else(|| display_name.clone());
+
+    // Sanitize filename: strip path separators and traversal components
+    let safe_file = sanitize_filename(&raw_file);
+    if safe_file.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid filename after sanitization"})),
+        );
+    }
 
     // Write file to disk
     let dir = artifacts_dir().join(plan_id.to_string());
@@ -88,6 +112,14 @@ async fn handle_upload(
         );
     }
     let file_path = dir.join(&safe_file);
+    // Verify resolved path stays within artifacts dir (defense-in-depth)
+    let base = artifacts_dir();
+    if !file_path.starts_with(&base) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "path traversal blocked"})),
+        );
+    }
     if let Err(e) = tokio::fs::write(&file_path, &data).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -196,6 +228,14 @@ async fn handle_download(State(pool): State<ConnPool>, Path(id): Path<i64>) -> i
     drop(conn);
 
     let file_path = artifacts_dir().join(&art.path);
+    // Verify resolved path stays within artifacts dir
+    if !file_path.starts_with(artifacts_dir()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            [(header::CONTENT_TYPE, "application/json".to_string())],
+            Body::from(json!({"error": "path traversal blocked"}).to_string()),
+        );
+    }
     let file = match tokio::fs::File::open(&file_path).await {
         Ok(f) => f,
         Err(e) => {

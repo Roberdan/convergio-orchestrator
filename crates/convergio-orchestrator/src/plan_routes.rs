@@ -114,6 +114,15 @@ async fn handle_create(
     State(state): State<Arc<PlanState>>,
     Json(body): Json<CreatePlan>,
 ) -> Json<serde_json::Value> {
+    // Input validation: bound string lengths to prevent abuse
+    if body.name.len() > 500
+        || body.project_id.len() > 200
+        || body.objective.len() > 5000
+        || body.motivation.len() > 5000
+        || body.requester.len() > 200
+    {
+        return Json(json!({"error": "field exceeds maximum length"}));
+    }
     let conn = match state.pool.get() {
         Ok(c) => c,
         Err(e) => return Json(json!({"error": e.to_string()})),

@@ -74,6 +74,21 @@ async fn handle_wave_update(
     State(state): State<Arc<PlanState>>,
     Json(body): Json<WaveUpdate>,
 ) -> Json<serde_json::Value> {
+    // Validate wave status is a known value
+    const VALID_WAVE_STATUSES: &[&str] = &[
+        "pending",
+        "in_progress",
+        "done",
+        "cancelled",
+        "failed",
+        "paused",
+    ];
+    if !VALID_WAVE_STATUSES.contains(&body.status.as_str()) {
+        return Json(json!({
+            "error": format!("invalid wave status '{}'", body.status),
+            "allowed": VALID_WAVE_STATUSES,
+        }));
+    }
     let conn = match state.pool.get() {
         Ok(c) => c,
         Err(e) => return Json(json!({"error": e.to_string()})),
