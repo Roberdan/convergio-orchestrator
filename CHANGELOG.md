@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Roberdan/convergio-orchestrator/compare/convergio-orchestrator-v0.1.1...convergio-orchestrator-v0.1.2) (2026-04-12)
+
+
+### Documentation
+
+* add .env.example with required environment variables ([#3](https://github.com/Roberdan/convergio-orchestrator/issues/3)) ([995edfa](https://github.com/Roberdan/convergio-orchestrator/commit/995edfa658067ea6ed427a91dde7e14ab9a9ff18))
+
 ## [0.1.1](https://github.com/Roberdan/convergio-orchestrator/compare/convergio-orchestrator-v0.1.0...convergio-orchestrator-v0.1.1) (2026-04-12)
 
 
