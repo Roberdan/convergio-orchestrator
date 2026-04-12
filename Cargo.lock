@@ -330,7 +330,6 @@ dependencies = [
  "chrono",
  "convergio-db 0.1.7",
  "convergio-orchestrator",
- "convergio-telemetry",
  "convergio-types",
  "rusqlite",
  "serde",
