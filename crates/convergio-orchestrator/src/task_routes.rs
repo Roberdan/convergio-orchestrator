@@ -68,6 +68,17 @@ async fn handle_task_create(
     State(state): State<Arc<PlanState>>,
     Json(body): Json<TaskCreate>,
 ) -> Response {
+    // Input validation: bound string lengths
+    if body.title.len() > 500
+        || body.description.as_deref().unwrap_or("").len() > 10000
+        || body.task_id.as_deref().unwrap_or("").len() > 200
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "field exceeds maximum length"})),
+        )
+            .into_response();
+    }
     let conn = match state.pool.get() {
         Ok(c) => c,
         Err(e) => return Json(json!({"error": e.to_string()})).into_response(),

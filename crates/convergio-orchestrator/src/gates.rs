@@ -285,7 +285,15 @@ pub fn check_task_transition(
             validator_gate(&conn, task_id)?;
             Ok(())
         }
-        _ => Ok(()),
+        // Explicitly allow only known non-gated transitions
+        "pending" | "cancelled" | "skipped" | "stale" | "failed" => Ok(()),
+        unknown => Err(GateError {
+            gate: "TaskStatusGate",
+            reason: format!("unknown task status '{unknown}'"),
+            expected: "status must be one of: pending, in_progress, submitted, done, \
+                       cancelled, skipped, stale, failed"
+                .into(),
+        }),
     }
 }
 
