@@ -1,0 +1,36 @@
+[package]
+name = "convergio-orchestrator"
+description = "Plans, tasks, waves, Thor gate, reaper — orchestration engine"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+convergio-types = { workspace = true }
+convergio-db = { workspace = true }
+convergio-ipc = { workspace = true }
+convergio-telemetry = { workspace = true }
+convergio-scaffold = { workspace = true }
+convergio-ceo = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+rusqlite = { workspace = true }
+reqwest = { workspace = true }
+axum = { workspace = true }
+serde_yaml = { workspace = true }
+uuid = { workspace = true }
+libc = { workspace = true }
+tokio-util = { workspace = true }
+regex-lite = { workspace = true }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+convergio-ipc = { workspace = true }
+convergio-evidence = { workspace = true }
+r2d2 = { workspace = true }
+r2d2_sqlite = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = "3"

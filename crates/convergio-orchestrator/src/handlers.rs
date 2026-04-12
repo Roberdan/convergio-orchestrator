@@ -1,0 +1,168 @@
+// Handlers — one function per orchestration event type.
+use crate::{actions, plan_hierarchy};
+use convergio_db::pool::ConnPool;
+use convergio_types::events::DomainEventSink;
+use rusqlite::params;
+use std::sync::Arc;
+use tokio::sync::Notify;
+
+type AliResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+#[tracing::instrument(skip_all, fields(%plan_id))]
+pub async fn on_plan_ready(pool: &ConnPool, notify: &Arc<Notify>, plan_id: i64) -> AliResult {
+    let conn = pool.get()?;
+    let deps_met = plan_hierarchy::dependencies_met(&conn, plan_id)?;
+
+    if !deps_met {
+        tracing::info!("ali: plan {plan_id} blocked — dependencies not met");
+        actions::emit(
+            pool,
+            notify,
+            "plan_blocked",
+            &serde_json::json!({"plan_id": plan_id}),
+        )?;
+        return Ok(());
+    }
+
+    tracing::info!("ali: plan {plan_id} ready — delegating");
+    actions::delegate_plan(pool, notify, plan_id).await
+}
+
+#[tracing::instrument(skip_all, fields(%task_id, %plan_id))]
+pub fn on_task_done(
+    pool: &ConnPool,
+    notify: &Arc<Notify>,
+    task_id: &str,
+    plan_id: i64,
+) -> AliResult {
+    let conn = pool.get()?;
+
+    let wave_id: Option<i64> = match conn.query_row(
+        "SELECT wave_id FROM tasks WHERE id = ?1 AND plan_id = ?2",
+        params![task_id, plan_id],
+        |row| row.get(0),
+    ) {
+        Ok(v) => Some(v),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(e) => {
+            tracing::warn!("ali: wave_id lookup for task {task_id}: {e}");
+            None
+        }
+    };
+
+    let Some(wave_id) = wave_id else {
+        tracing::warn!("ali: task {task_id} not found in plan {plan_id}");
+        return Ok(());
+    };
+
+    // Atomic guard prevents duplicate wave_done when concurrent task_done events arrive
+    let pending: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tasks WHERE plan_id = ?1 AND wave_id = ?2 \
+         AND status NOT IN ('done', 'submitted', 'cancelled', 'skipped')",
+        params![plan_id, wave_id],
+        |row| row.get(0),
+    )?;
+
+    tracing::info!("ali: task {task_id} done, wave {wave_id} has {pending} remaining");
+
+    if pending == 0 {
+        // Atomic guard: only emit wave_done if wave is still 'in_progress'.
+        // CAS-style: UPDATE returns 0 if another task_done already flipped it.
+        let flipped = conn.execute(
+            "UPDATE waves SET status = 'completing' \
+             WHERE id = ?1 AND status = 'in_progress'",
+            params![wave_id],
+        )?;
+        if flipped > 0 {
+            actions::emit(
+                pool,
+                notify,
+                "wave_done",
+                &serde_json::json!({"wave_id": wave_id, "plan_id": plan_id}),
+            )?;
+        } else {
+            tracing::debug!("ali: wave {wave_id} already completing, skipping duplicate");
+        }
+    }
+
+    Ok(())
+}
+
+#[tracing::instrument(skip_all, fields(%plan_id))]
+pub fn on_plan_done(
+    pool: &ConnPool,
+    notify: &Arc<Notify>,
+    event_sink: &Option<Arc<dyn DomainEventSink>>,
+    plan_id: i64,
+) -> AliResult {
+    let conn = pool.get()?;
+
+    // Mark plan as done in DB
+    conn.execute(
+        "UPDATE plans SET status = 'done', completed_at = datetime('now'), \
+         updated_at = datetime('now') WHERE id = ?1",
+        params![plan_id],
+    )?;
+
+    let plan_name: String = conn
+        .query_row(
+            "SELECT name FROM plans WHERE id = ?1",
+            params![plan_id],
+            |r| r.get(0),
+        )
+        .unwrap_or_else(|_| format!("Plan #{plan_id}"));
+
+    tracing::info!("ali: plan {plan_id} ({plan_name}) marked done");
+
+    // Emit PlanCompleted domain event for SSE/UI
+    if let Some(ref sink) = event_sink {
+        sink.emit(convergio_types::events::make_event(
+            "orchestrator",
+            convergio_types::events::EventKind::PlanCompleted {
+                plan_id,
+                name: plan_name.clone(),
+            },
+            convergio_types::events::EventContext {
+                plan_id: Some(plan_id),
+                ..Default::default()
+            },
+        ));
+    }
+
+    notify_plan_done(plan_id, &plan_name);
+    learning::extract_plan_learnings(pool.clone(), plan_id);
+    cleanup::cleanup_plan_worktrees(pool.clone(), plan_id);
+
+    let parent_id: Option<i64> = conn
+        .query_row(
+            "SELECT parent_plan_id FROM plans WHERE id = ?1",
+            params![plan_id],
+            |row| row.get::<_, Option<i64>>(0),
+        )
+        .unwrap_or(None);
+    if let Some(master_id) = parent_id {
+        let (done, total, status) = plan_hierarchy::master_rollup(&conn, master_id)?;
+        tracing::info!("ali: master {master_id} rollup: {done}/{total} status={status}");
+        actions::check_unblocked_plans(pool, notify, &conn, master_id)?;
+    }
+
+    Ok(())
+}
+
+#[path = "handlers_notify.rs"]
+mod notify;
+use notify::notify_plan_done;
+
+#[path = "handlers_cleanup.rs"]
+mod cleanup;
+
+#[path = "handlers_learning.rs"]
+mod learning;
+
+#[path = "handlers_wave.rs"]
+mod wave;
+pub use wave::{on_wave_done, on_wave_validated};
+
+#[path = "handlers_delegation.rs"]
+mod delegation;
+pub use delegation::{on_delegation_failed, on_wave_ready};
