@@ -5,7 +5,7 @@ members = ["crates/convergio-orchestrator", "crates/convergio-evidence"]
 [workspace.package]
 version = "0.1.7"
 edition = "2021"
-license = "LicenseRef-Convergio-Community"
+license = "MIT"
 repository = "https://github.com/Roberdan/convergio-orchestrator"
 
 [workspace.dependencies]
