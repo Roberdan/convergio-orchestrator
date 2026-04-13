@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.6...v0.1.7) (2026-04-13)
+
+
+### Bug Fixes
+
+* allow plan recovery from failed state and prevent premature plan failure ([d3b75fb](https://github.com/Roberdan/convergio-orchestrator/commit/d3b75fb19c7aa2e5e25f59cf7fb32c67e202bbcd))
+* plan recovery from failed state ([#970](https://github.com/Roberdan/convergio-orchestrator/issues/970)) ([cd813c4](https://github.com/Roberdan/convergio-orchestrator/commit/cd813c42a2d6c5d8097e95c60ad679c417b306f1))
+
 ## [0.1.6](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.5...v0.1.6) (2026-04-13)
 
 
