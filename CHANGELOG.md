@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.8](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.7...v0.1.8) (2026-04-13)
+
+
+### Bug Fixes
+
+* plan executor respects assignee:manual — stops auto-pause/fail ([#984](https://github.com/Roberdan/convergio-orchestrator/issues/984)) ([2bde4d4](https://github.com/Roberdan/convergio-orchestrator/commit/2bde4d4239a71d7595787f2402158c8cea18457b))
+* plan executor respects assignee:manual ([#984](https://github.com/Roberdan/convergio-orchestrator/issues/984)) ([deb4294](https://github.com/Roberdan/convergio-orchestrator/commit/deb4294b793ae68dfc9a498db7ad672d1e3d67ed))
+* wave_pr_guard skips cross-repo waves with direct_to_main ([#986](https://github.com/Roberdan/convergio-orchestrator/issues/986)) ([78268a8](https://github.com/Roberdan/convergio-orchestrator/commit/78268a8919ef2f2a4fe462fae229ba36ec35ee2b))
+
 ## [0.1.7](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.6...v0.1.7) (2026-04-13)
 
 
