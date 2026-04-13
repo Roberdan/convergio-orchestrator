@@ -3,20 +3,19 @@ resolver = "2"
 members = ["crates/convergio-orchestrator", "crates/convergio-evidence"]
 
 [workspace.package]
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/Roberdan/convergio-orchestrator"
 
 [workspace.dependencies]
 # SDK dependencies
-convergio-sdk = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9" }
-convergio-types = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
-convergio-db = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
-convergio-telemetry = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
+convergio-types = "0.1"
+convergio-db = "0.1"
+convergio-telemetry = "0.1"
 convergio-ipc = "0.1"
-convergio-scaffold = { git = "https://github.com/Roberdan/convergio-scaffold", tag = "convergio-scaffold-v0.1.2", version = "0.1" }
-convergio-ceo = { git = "https://github.com/Roberdan/convergio-ceo", tag = "convergio-ceo-v0.1.2", version = "0.1" }
+convergio-scaffold = "0.1"
+convergio-ceo = "0.1"
 # Local workspace members (for circular dep resolution)
 convergio-orchestrator = { path = "crates/convergio-orchestrator" }
 convergio-evidence = { path = "crates/convergio-evidence" }
