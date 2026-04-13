@@ -61,12 +61,13 @@ fn ensure_spawn_failures_column(pool: &ConnPool) {
 }
 
 /// On boot: pause only STALE in_progress plans (no task activity in 15+ minutes).
-/// Plans with recent task updates or active agents are left running — this
-/// prevents "start plan → daemon restart → plan paused" (#666, #867, #872).
+/// Plans with recent task updates, active agents, or manual assignees are left
+/// running — prevents "start plan → daemon restart → plan paused" (#666, #867,
+/// #872, #984).
 fn pause_plans_on_boot(pool: &ConnPool) {
     let Ok(conn) = pool.get() else { return };
     // Only pause plans where NEITHER the plan NOR any task was updated recently,
-    // and no tasks have active agents assigned.
+    // and no tasks have active agents or manual assignment.
     let updated = conn
         .execute(
             "UPDATE plans SET status = 'paused' \
@@ -79,6 +80,10 @@ fn pause_plans_on_boot(pool: &ConnPool) {
                    OR completed_at > datetime('now', '-15 minutes') \
                    OR (executor_agent IS NOT NULL \
                        AND status IN ('pending', 'in_progress')) \
+               ) \
+               AND id NOT IN ( \
+                 SELECT DISTINCT plan_id FROM tasks \
+                 WHERE executor_agent = 'manual' \
                )",
             [],
         )
@@ -146,12 +151,11 @@ async fn executor_tick(pool: &ConnPool) -> Result<bool, Box<dyn std::error::Erro
     Ok(had_failure)
 }
 
-/// Circuit breaker: if ALL tasks in the current wave of a plan have failed,
-/// mark the plan as failed. Individual task failures no longer halt the plan;
-/// only a complete wave wipeout triggers plan failure.
+/// Circuit breaker: if ALL auto-spawnable tasks in the current wave of a plan
+/// have failed, mark the plan as failed. Excludes manual tasks (#984).
 fn check_circuit_breaker(pool: &ConnPool) {
     let Ok(conn) = pool.get() else { return };
-    // Find in_progress plans where the active wave has all tasks failed
+    // Find in_progress plans where the active wave has all NON-MANUAL tasks failed
     let mut stmt = match conn.prepare(
         "SELECT p.id, p.name \
          FROM plans p \
@@ -161,10 +165,14 @@ fn check_circuit_breaker(pool: &ConnPool) {
              WHERE w.plan_id = p.id AND w.status = 'in_progress' \
                AND NOT EXISTS ( \
                  SELECT 1 FROM tasks t \
-                 WHERE t.wave_id = w.id AND t.status NOT IN ('failed', 'cancelled') \
+                 WHERE t.wave_id = w.id \
+                   AND t.status NOT IN ('failed', 'cancelled') \
+                   AND COALESCE(t.executor_agent, '') != 'manual' \
                ) \
                AND EXISTS ( \
-                 SELECT 1 FROM tasks t2 WHERE t2.wave_id = w.id AND t2.status = 'failed' \
+                 SELECT 1 FROM tasks t2 \
+                 WHERE t2.wave_id = w.id AND t2.status = 'failed' \
+                   AND COALESCE(t2.executor_agent, '') != 'manual' \
                ) \
            )",
     ) {
@@ -210,6 +218,7 @@ fn find_pending_tasks(pool: &ConnPool) -> Result<Vec<PendingTask>, rusqlite::Err
     })?;
     crate::schema::ensure_required_capabilities_column(&conn)?;
 
+    // Skip tasks with executor_agent = 'manual' — those wait for human/orchestrator (#984)
     let mut stmt = conn.prepare(
         "SELECT t.id, t.task_id, t.plan_id, t.wave_id, t.title, \
                 COALESCE(t.description, ''), COALESCE(t.notes, ''), \
@@ -221,6 +230,7 @@ fn find_pending_tasks(pool: &ConnPool) -> Result<Vec<PendingTask>, rusqlite::Err
            AND w.status = 'in_progress' \
            AND p.status = 'in_progress' \
            AND p.project_id != '_doctor_test_proj' \
+           AND COALESCE(t.executor_agent, '') != 'manual' \
            AND w.id = (SELECT MIN(w2.id) FROM waves w2 \
                        WHERE w2.plan_id = t.plan_id AND w2.status = 'in_progress') \
          ORDER BY t.id ASC \
