@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.5...v0.1.6) (2026-04-13)
+
+
+### Bug Fixes
+
+* remove redundant path validation on checkpoint save ([fbd6839](https://github.com/Roberdan/convergio-orchestrator/commit/fbd68393bb34d49a2860bb0d34a353479955fbc4))
+* remove redundant path validation on checkpoint save ([#10](https://github.com/Roberdan/convergio-orchestrator/issues/10)) ([2f11c07](https://github.com/Roberdan/convergio-orchestrator/commit/2f11c075e893c4f64367ece5f98d8707caa5fc69))
+
 ## [0.1.5](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.4...v0.1.5) (2026-04-13)
 
 
