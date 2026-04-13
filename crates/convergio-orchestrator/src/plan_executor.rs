@@ -209,6 +209,8 @@ pub(crate) struct PendingTask {
     pub(crate) notes: String,
     pub(crate) required_capabilities: Option<String>,
     pub(crate) executor_agent: Option<String>,
+    /// Repo path from task metadata — used as repo_override in spawn.
+    pub(crate) repo_path: Option<String>,
 }
 
 /// Find tasks that are pending in waves that are in_progress.
@@ -222,7 +224,8 @@ fn find_pending_tasks(pool: &ConnPool) -> Result<Vec<PendingTask>, rusqlite::Err
     let mut stmt = conn.prepare(
         "SELECT t.id, t.task_id, t.plan_id, t.wave_id, t.title, \
                 COALESCE(t.description, ''), COALESCE(t.notes, ''), \
-                t.required_capabilities, t.executor_agent \
+                t.required_capabilities, t.executor_agent, \
+                COALESCE(t.metadata, '{}') \
          FROM tasks t \
          JOIN waves w ON w.id = t.wave_id \
          JOIN plans p ON p.id = t.plan_id \
@@ -239,6 +242,10 @@ fn find_pending_tasks(pool: &ConnPool) -> Result<Vec<PendingTask>, rusqlite::Err
 
     let tasks = stmt
         .query_map([], |r| {
+            let metadata_str: String = r.get(9)?;
+            let repo_path = serde_json::from_str::<serde_json::Value>(&metadata_str)
+                .ok()
+                .and_then(|v| v.get("repo_path")?.as_str().map(|s| s.to_string()));
             Ok(PendingTask {
                 db_id: r.get(0)?,
                 task_id: r.get(1)?,
@@ -249,6 +256,7 @@ fn find_pending_tasks(pool: &ConnPool) -> Result<Vec<PendingTask>, rusqlite::Err
                 notes: r.get(6)?,
                 required_capabilities: r.get(7)?,
                 executor_agent: r.get(8)?,
+                repo_path,
             })
         })?
         .filter_map(|r| r.ok())

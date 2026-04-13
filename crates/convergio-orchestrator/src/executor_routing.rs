@@ -101,18 +101,24 @@ async fn spawn_local_agent(
     let instructions =
         super::task_instructions::enrich_with_knowledge(&instructions, &description).await;
 
+    let mut spawn_body = json!({
+        "agent_name": agent_name,
+        "org_id": "convergio-io",
+        "task_id": task.db_id,
+        "instructions": instructions,
+        "tier": "t1",
+        "budget_usd": 10,
+        "timeout_secs": 3600,
+    });
+    // Pass repo_override so the spawner creates the worktree in the right repo
+    if let Some(ref repo) = task.repo_path {
+        spawn_body["repo_override"] = json!(repo);
+    }
+
     let resp = client
         .post(format!("{DAEMON_BASE}/api/agents/spawn"))
         .header("Authorization", convergio_types::dev_auth_header())
-        .json(&json!({
-            "agent_name": agent_name,
-            "org_id": "convergio-io",
-            "task_id": task.db_id,
-            "instructions": instructions,
-            "tier": "t1",
-            "budget_usd": 10,
-            "timeout_secs": 3600,
-        }))
+        .json(&spawn_body)
         .send()
         .await?;
 

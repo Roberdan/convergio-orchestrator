@@ -41,6 +41,9 @@ pub struct SpecTask {
     pub validator_agent: Option<String>,
     #[serde(default)]
     pub verify: Vec<String>,
+    /// Absolute path to the repo this task works on. If unset, uses daemon repo.
+    #[serde(default)]
+    pub repo_path: Option<String>,
 }
 
 pub struct ImportStats {
@@ -201,6 +204,7 @@ fn import_tasks(
             "validator_agent": task.validator_agent,
             "verify": task.verify,
             "order": wave_order,
+            "repo_path": task.repo_path,
         });
 
         // Merge mode: try to update existing task first

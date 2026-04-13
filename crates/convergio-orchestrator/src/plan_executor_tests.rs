@@ -120,6 +120,7 @@ fn build_task_instructions_includes_context() {
         notes: String::new(),
         required_capabilities: None,
         executor_agent: None,
+        repo_path: None,
     };
     let instructions = task_instructions::build(&pool, &task).unwrap();
     assert!(instructions.contains("Test task"));
