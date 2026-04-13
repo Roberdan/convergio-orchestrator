@@ -14,8 +14,6 @@ const EXECUTOR_INTERVAL_SECS: u64 = 30;
 const DAEMON_BASE: &str = "http://localhost:8420";
 const MAX_SPAWN_FAILURES: i64 = 3;
 const STALE_HOURS: i64 = 24;
-/// Circuit breaker: if a plan has this many failed tasks, halt it.
-const CIRCUIT_BREAKER_THRESHOLD: i64 = 5;
 /// Rate limiter: max spawns per executor tick across all plans.
 const MAX_SPAWNS_PER_TICK: usize = 3;
 /// Cooldown: skip tick if a recent spawn failed (backoff seconds).
@@ -148,34 +146,41 @@ async fn executor_tick(pool: &ConnPool) -> Result<bool, Box<dyn std::error::Erro
     Ok(had_failure)
 }
 
-/// Circuit breaker: if a plan has >= CIRCUIT_BREAKER_THRESHOLD failed tasks,
-/// mark it as failed and stop spawning. Prevents infinite retry loops.
+/// Circuit breaker: if ALL tasks in the current wave of a plan have failed,
+/// mark the plan as failed. Individual task failures no longer halt the plan;
+/// only a complete wave wipeout triggers plan failure.
 fn check_circuit_breaker(pool: &ConnPool) {
     let Ok(conn) = pool.get() else { return };
+    // Find in_progress plans where the active wave has all tasks failed
     let mut stmt = match conn.prepare(
-        "SELECT p.id, p.name, COUNT(*) as fail_count \
+        "SELECT p.id, p.name \
          FROM plans p \
-         JOIN tasks t ON t.plan_id = p.id \
-         WHERE p.status = 'in_progress' AND t.status = 'failed' \
-         GROUP BY p.id \
-         HAVING COUNT(*) >= ?1",
+         WHERE p.status = 'in_progress' \
+           AND EXISTS ( \
+             SELECT 1 FROM waves w \
+             WHERE w.plan_id = p.id AND w.status = 'in_progress' \
+               AND NOT EXISTS ( \
+                 SELECT 1 FROM tasks t \
+                 WHERE t.wave_id = w.id AND t.status NOT IN ('failed', 'cancelled') \
+               ) \
+               AND EXISTS ( \
+                 SELECT 1 FROM tasks t2 WHERE t2.wave_id = w.id AND t2.status = 'failed' \
+               ) \
+           )",
     ) {
         Ok(s) => s,
         Err(_) => return,
     };
-    let plans: Vec<(i64, String, i64)> = stmt
-        .query_map(params![CIRCUIT_BREAKER_THRESHOLD], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })
+    let plans: Vec<(i64, String)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    for (plan_id, plan_name, fail_count) in plans {
+    for (plan_id, plan_name) in plans {
         tracing::error!(
             plan_id,
             plan_name = plan_name.as_str(),
-            fail_count,
-            "CIRCUIT BREAKER: halting plan with {fail_count} failed tasks"
+            "CIRCUIT BREAKER: all tasks in active wave failed — halting plan"
         );
         let _ = conn.execute(
             "UPDATE plans SET status = 'failed', \

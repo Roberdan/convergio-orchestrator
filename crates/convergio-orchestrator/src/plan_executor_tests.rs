@@ -127,3 +127,44 @@ fn build_task_instructions_includes_context() {
     assert!(instructions.contains("complete-flow"));
     assert!(instructions.contains("901"));
 }
+
+#[test]
+fn circuit_breaker_does_not_fail_plan_with_partial_failures() {
+    let pool = setup_pool();
+    seed_plan(&pool);
+    {
+        let conn = pool.get().unwrap();
+        // Mark one task as failed, leave another pending
+        conn.execute("UPDATE tasks SET status = 'failed' WHERE id = 901", [])
+            .unwrap();
+    }
+    check_circuit_breaker(&pool);
+    let conn = pool.get().unwrap();
+    let status: String = conn
+        .query_row("SELECT status FROM plans WHERE id = 99", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        status, "in_progress",
+        "plan should stay in_progress when some tasks are not failed"
+    );
+}
+
+#[test]
+fn circuit_breaker_fails_plan_when_all_wave_tasks_failed() {
+    let pool = setup_pool();
+    seed_plan(&pool);
+    {
+        let conn = pool.get().unwrap();
+        conn.execute("UPDATE tasks SET status = 'failed' WHERE plan_id = 99", [])
+            .unwrap();
+    }
+    check_circuit_breaker(&pool);
+    let conn = pool.get().unwrap();
+    let status: String = conn
+        .query_row("SELECT status FROM plans WHERE id = 99", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        status, "failed",
+        "plan should fail when all tasks in wave failed"
+    );
+}

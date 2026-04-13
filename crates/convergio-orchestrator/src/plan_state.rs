@@ -89,6 +89,7 @@ impl PlanStatus {
                 | (Self::Stale, Self::Failed)
                 // Retry from failure
                 | (Self::Failed, Self::Draft)
+                | (Self::Failed, Self::InProgress)
                 | (Self::Failed, Self::Cancelled)
         )
     }
@@ -160,7 +161,7 @@ mod tests {
     #[test]
     fn retry_from_failure() {
         assert!(PlanStatus::Failed.can_transition_to(&PlanStatus::Draft));
-        assert!(!PlanStatus::Failed.can_transition_to(&PlanStatus::InProgress));
+        assert!(PlanStatus::Failed.can_transition_to(&PlanStatus::InProgress));
     }
 
     #[test]
