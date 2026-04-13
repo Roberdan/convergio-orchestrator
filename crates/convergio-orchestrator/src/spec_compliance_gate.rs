@@ -43,8 +43,17 @@ pub fn spec_compliance_gate(conn: &Connection, task_id: i64) -> Result<(), GateE
         }
     }
 
-    // Extract required files that must exist
+    // Extract required files that must exist (workspace-relative only)
     for path in extract_required_files(&full_text) {
+        // Block absolute paths and traversal components
+        if path.starts_with('/') || path.starts_with('\\') || path.contains("..") {
+            return Err(GateError {
+                gate: "SpecComplianceGate",
+                reason: format!("rejected unsafe file path '{path}'"),
+                expected: "spec file paths must be workspace-relative without '..' components"
+                    .into(),
+            });
+        }
         if !std::path::Path::new(&path).exists() {
             return Err(GateError {
                 gate: "SpecComplianceGate",

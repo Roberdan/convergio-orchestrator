@@ -106,24 +106,37 @@ async fn handle_upload(
     // Write file to disk
     let dir = artifacts_dir().join(plan_id.to_string());
     if let Err(e) = tokio::fs::create_dir_all(&dir).await {
+        tracing::error!("artifact mkdir failed: {e}");
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("mkdir failed: {e}")})),
+            Json(json!({"error": "failed to create artifact directory"})),
         );
     }
     let file_path = dir.join(&safe_file);
-    // Verify resolved path stays within artifacts dir (defense-in-depth)
-    let base = artifacts_dir();
-    if !file_path.starts_with(&base) {
+    // Verify resolved path stays within artifacts dir (defense-in-depth via canonicalize)
+    let base = match artifacts_dir().canonicalize() {
+        Ok(b) => b,
+        Err(_) => artifacts_dir(),
+    };
+    let resolved = match file_path.canonicalize() {
+        Ok(r) => r,
+        // File doesn't exist yet, check parent dir instead
+        Err(_) => match dir.canonicalize() {
+            Ok(d) => d.join(&safe_file),
+            Err(_) => file_path.clone(),
+        },
+    };
+    if !resolved.starts_with(&base) {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "path traversal blocked"})),
         );
     }
     if let Err(e) = tokio::fs::write(&file_path, &data).await {
+        tracing::error!("artifact write failed: {e}");
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("write failed: {e}")})),
+            Json(json!({"error": "failed to write artifact file"})),
         );
     }
 
@@ -133,10 +146,11 @@ async fn handle_upload(
     let conn = match pool.get() {
         Ok(c) => c,
         Err(e) => {
+            tracing::error!("artifact upload pool error: {e}");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
-            )
+                Json(json!({"error": "internal server error"})),
+            );
         }
     };
 
@@ -162,10 +176,13 @@ async fn handle_upload(
                 Json(json!({"id": id, "path": relative})),
             )
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": e.to_string()})),
-        ),
+        Err(e) => {
+            tracing::error!("artifact record failed: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to record artifact"})),
+            )
+        }
     }
 }
 
@@ -175,7 +192,10 @@ async fn handle_list_plan(
 ) -> Json<serde_json::Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("artifact list plan pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let arts = artifacts::list_artifacts(&conn, plan_id);
     Json(json!(arts))
@@ -187,7 +207,10 @@ async fn handle_list_task(
 ) -> Json<serde_json::Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("artifact list task pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let arts = artifacts::list_task_artifacts(&conn, task_id);
     Json(json!(arts))
@@ -196,7 +219,10 @@ async fn handle_list_task(
 async fn handle_get(State(pool): State<ConnPool>, Path(id): Path<i64>) -> Json<serde_json::Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("artifact get pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     match artifacts::get_artifact(&conn, id) {
         Some(art) => Json(json!(art)),
@@ -208,11 +234,12 @@ async fn handle_download(State(pool): State<ConnPool>, Path(id): Path<i64>) -> i
     let conn = match pool.get() {
         Ok(c) => c,
         Err(e) => {
+            tracing::error!("artifact download pool error: {e}");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 [(header::CONTENT_TYPE, "application/json".to_string())],
-                Body::from(json!({"error": e.to_string()}).to_string()),
-            )
+                Body::from(json!({"error": "internal server error"}).to_string()),
+            );
         }
     };
     let art = match artifacts::get_artifact(&conn, id) {
@@ -228,8 +255,16 @@ async fn handle_download(State(pool): State<ConnPool>, Path(id): Path<i64>) -> i
     drop(conn);
 
     let file_path = artifacts_dir().join(&art.path);
-    // Verify resolved path stays within artifacts dir
-    if !file_path.starts_with(artifacts_dir()) {
+    // Verify resolved path stays within artifacts dir (canonicalize for symlink safety)
+    let base = match artifacts_dir().canonicalize() {
+        Ok(b) => b,
+        Err(_) => artifacts_dir(),
+    };
+    let resolved = match file_path.canonicalize() {
+        Ok(r) => r,
+        Err(_) => file_path.clone(),
+    };
+    if !resolved.starts_with(&base) {
         return (
             StatusCode::BAD_REQUEST,
             [(header::CONTENT_TYPE, "application/json".to_string())],
@@ -239,11 +274,12 @@ async fn handle_download(State(pool): State<ConnPool>, Path(id): Path<i64>) -> i
     let file = match tokio::fs::File::open(&file_path).await {
         Ok(f) => f,
         Err(e) => {
+            tracing::warn!("artifact file open failed: {e}");
             return (
                 StatusCode::NOT_FOUND,
                 [(header::CONTENT_TYPE, "application/json".to_string())],
-                Body::from(json!({"error": format!("file: {e}")}).to_string()),
-            )
+                Body::from(json!({"error": "artifact file not found"}).to_string()),
+            );
         }
     };
 

@@ -45,10 +45,11 @@ async fn handle_evidence_create(
     let conn = match state.pool.get() {
         Ok(c) => c,
         Err(e) => {
+            tracing::error!("evidence create pool error: {e}");
             return (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
-            )
+                Json(json!({"error": "internal server error"})),
+            );
         }
     };
     // Pre-check: task must exist and be in_progress
@@ -115,10 +116,13 @@ async fn handle_evidence_create(
                 Json(json!({"id": id, "task_db_id": body.task_db_id})),
             )
         }
-        Err(e) => (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": e.to_string()})),
-        ),
+        Err(e) => {
+            tracing::error!(task_db_id = %body.task_db_id, "evidence insert failed: {e}");
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "internal server error"})),
+            )
+        }
     }
 }
 
@@ -129,27 +133,35 @@ async fn handle_evidence_get(
 ) -> Json<serde_json::Value> {
     let conn = match state.pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("evidence get pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let mut stmt = match conn.prepare(
         "SELECT id, evidence_type, command, output_summary, exit_code \
          FROM task_evidence WHERE task_db_id = ?1 ORDER BY id",
     ) {
         Ok(s) => s,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("evidence prepare error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
-    let rows: Vec<serde_json::Value> = stmt
-        .query_map(params![task_id], |r| {
-            Ok(json!({
-                "id": r.get::<_, i64>(0)?,
-                "type": r.get::<_, String>(1)?,
-                "command": r.get::<_, String>(2)?,
-                "summary": r.get::<_, String>(3)?,
-                "exit_code": r.get::<_, i32>(4)?
-            }))
-        })
-        .unwrap_or_else(|_| panic!("evidence query failed"))
-        .filter_map(|r| r.ok())
-        .collect();
+    let rows: Vec<serde_json::Value> = match stmt.query_map(params![task_id], |r| {
+        Ok(json!({
+            "id": r.get::<_, i64>(0)?,
+            "type": r.get::<_, String>(1)?,
+            "command": r.get::<_, String>(2)?,
+            "summary": r.get::<_, String>(3)?,
+            "exit_code": r.get::<_, i32>(4)?
+        }))
+    }) {
+        Ok(mapped) => mapped.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            tracing::warn!(task_id, "evidence query failed: {e}");
+            return Json(json!({"error": "internal error querying evidence"}));
+        }
+    };
     Json(json!({"task_db_id": task_id, "evidence": rows}))
 }

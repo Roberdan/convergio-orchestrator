@@ -14,13 +14,26 @@ pub fn task_lock_gate(
     task_id: i64,
     agent_id: Option<&str>,
 ) -> Result<(), GateError> {
-    let locked_by: String = conn
-        .query_row(
-            "SELECT COALESCE(locked_by, '') FROM tasks WHERE id = ?1",
-            [task_id],
-            |r| r.get(0),
-        )
-        .unwrap_or_default();
+    let locked_by: String = match conn.query_row(
+        "SELECT COALESCE(locked_by, '') FROM tasks WHERE id = ?1",
+        [task_id],
+        |r| r.get(0),
+    ) {
+        Ok(v) => v,
+        Err(rusqlite::Error::InvalidColumnName(_)) => return Ok(()),
+        Err(e) => {
+            // Distinguish "no such column" (schema not migrated) from real errors
+            let msg = e.to_string();
+            if msg.contains("no such column") {
+                return Ok(());
+            }
+            return Err(GateError {
+                gate: "TaskLockGate",
+                reason: format!("failed to query task lock for {task_id}"),
+                expected: "task must exist and be queryable".into(),
+            });
+        }
+    };
 
     if locked_by.is_empty() {
         return Ok(());
@@ -50,10 +63,12 @@ pub fn update_task_lock(conn: &Connection, task_id: i64, new_status: &str, agent
         "in_progress" => agent_id,
         _ => "", // clear lock on any terminal/non-progress state
     };
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE tasks SET locked_by = ?1 WHERE id = ?2",
         rusqlite::params![lock_value, task_id],
-    );
+    ) {
+        tracing::warn!(task_id, "task lock update failed: {e}");
+    }
 }
 
 /// WavePrDedupGate: ensures all tasks in a wave use the same PR.

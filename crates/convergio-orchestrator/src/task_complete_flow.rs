@@ -41,7 +41,10 @@ pub async fn handle_complete_flow(
 ) -> Json<serde_json::Value> {
     let conn = match state.pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("complete-flow pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
 
     // Step 1: Set notes with PR URL (PrCommitGate reads DB before status change)
@@ -82,7 +85,8 @@ pub async fn handle_complete_flow(
         "UPDATE tasks SET notes = ?1 WHERE id = ?2",
         params![notes, body.task_db_id],
     ) {
-        return Json(json!({"error": format!("set notes: {e}"), "step": "notes"}));
+        tracing::error!(task_db_id = body.task_db_id, "set notes failed: {e}");
+        return Json(json!({"error": "failed to set notes", "step": "notes"}));
     }
 
     // Step 2: Record evidence — test_result
@@ -97,8 +101,12 @@ pub async fn handle_complete_flow(
             body.test_exit_code
         ],
     ) {
+        tracing::error!(
+            task_db_id = body.task_db_id,
+            "evidence test_result insert failed: {e}"
+        );
         return Json(
-            json!({"error": format!("evidence test_result: {e}"), "step": "evidence_test_result"}),
+            json!({"error": "failed to record test_result evidence", "step": "evidence_test_result"}),
         );
     }
 
@@ -114,8 +122,12 @@ pub async fn handle_complete_flow(
             body.test_exit_code
         ],
     ) {
+        tracing::error!(
+            task_db_id = body.task_db_id,
+            "evidence test_pass insert failed: {e}"
+        );
         return Json(
-            json!({"error": format!("evidence test_pass: {e}"), "step": "evidence_test_pass"}),
+            json!({"error": "failed to record test_pass evidence", "step": "evidence_test_pass"}),
         );
     }
 
@@ -137,7 +149,11 @@ pub async fn handle_complete_flow(
          completed_at = datetime('now') WHERE id = ?1",
         params![body.task_db_id],
     ) {
-        return Json(json!({"error": format!("submit: {e}"), "step": "submit"}));
+        tracing::error!(
+            task_db_id = body.task_db_id,
+            "submit status update failed: {e}"
+        );
+        return Json(json!({"error": "failed to update status", "step": "submit"}));
     }
 
     // Audit trail
