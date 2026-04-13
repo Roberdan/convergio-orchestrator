@@ -124,10 +124,9 @@ async fn handle_checkpoint_save(
     if body.plan_id <= 0 {
         return Json(json!({"error": "invalid plan_id"}));
     }
-    let path = checkpoint_path(body.plan_id);
-    // Path is safe: built from integer plan_id, no user strings
-    convergio_types::platform_paths::validate_path_components(&path)
-        .unwrap_or_else(|e| panic!("checkpoint path validation bug: {e}"));
+    // Path is safe by construction: checkpoint_path() builds from integer plan_id only,
+    // no user-supplied strings. No validate_path_components needed — it rejects
+    // absolute paths and checkpoint_path() always returns one.
     let conn = match state.pool.get() {
         Ok(c) => c,
         Err(e) => return Json(json!({"error": e.to_string()})),
