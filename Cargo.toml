@@ -14,7 +14,7 @@ convergio-sdk = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1
 convergio-types = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
 convergio-db = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
 convergio-telemetry = { git = "https://github.com/Roberdan/convergio-sdk", tag = "v0.1.9", version = "0.1.6" }
-convergio-ipc = { git = "https://github.com/Roberdan/convergio-ipc", tag = "v0.1.6", version = "0.1" }, version = "0.1" }
+convergio-ipc = { git = "https://github.com/Roberdan/convergio-ipc", tag = "v0.1.6", version = "0.1" }
 convergio-scaffold = { git = "https://github.com/Roberdan/convergio-scaffold", tag = "convergio-scaffold-v0.1.2", version = "0.1" }
 convergio-ceo = { git = "https://github.com/Roberdan/convergio-ceo", tag = "convergio-ceo-v0.1.2", version = "0.1" }
 # Local workspace members (for circular dep resolution)
