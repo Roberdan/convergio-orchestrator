@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.3...v0.1.4) (2026-04-13)
+
+
+### Bug Fixes
+
+* **deps:** update convergio-ipc to v0.1.6 (SDK v0.1.9 aligned) ([13a6732](https://github.com/Roberdan/convergio-orchestrator/commit/13a673292e94ede813678049b93d10394f3e3482))
+
 ## [0.1.3](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.2...v0.1.3) (2026-04-13)
 
 
