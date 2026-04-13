@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.4...v0.1.5) (2026-04-13)
+
+
+### Bug Fixes
+
+* fix malformed convergio-ipc dependency in Cargo.toml ([#8](https://github.com/Roberdan/convergio-orchestrator/issues/8)) ([ecbe854](https://github.com/Roberdan/convergio-orchestrator/commit/ecbe854398bb429e4195e8aa4edccd7d218a2ac9))
+
 ## [0.1.4](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.3...v0.1.4) (2026-04-13)
 
 
