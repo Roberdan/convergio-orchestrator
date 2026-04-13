@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "convergio-orchestrator"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "axum",
  "chrono",
