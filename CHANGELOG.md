@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.8...v0.1.9) (2026-04-13)
+
+
+### Bug Fixes
+
+* add crates.io publishing metadata (description, repository) ([3730610](https://github.com/Roberdan/convergio-orchestrator/commit/37306108ba75e17c24aa88ad1e0db277a667d48b))
+
 ## [0.1.8](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.7...v0.1.8) (2026-04-13)
 
 
