@@ -52,24 +52,28 @@ pub async fn handle_complete_flow(
     };
 
     // Wave PR guard: block duplicate PRs for the same wave (#703)
+    // Skip for cross-repo waves where tasks have 'direct_to_main' in notes (#986)
     if body.pr_url.contains("/pull/") {
-        let wave_pr: Option<(i64, String)> = conn
-            .query_row(
-                "SELECT t2.wave_id, t2.notes FROM tasks t1 \
-                 JOIN tasks t2 ON t2.wave_id = t1.wave_id \
-                 WHERE t1.id = ?1 AND t2.id != ?1 \
-                 AND t2.notes LIKE 'https://github.com/%/pull/%' LIMIT 1",
-                params![body.task_db_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .ok();
-        if let Some((wave_id, existing)) = wave_pr {
-            let existing_url = existing.split_whitespace().next().unwrap_or(&existing);
-            if !body.pr_url.starts_with(existing_url) {
-                return Json(json!({
-                    "error": format!("Wave {wave_id} already has PR: {existing_url}. One PR per wave (Learning #25)."),
-                    "step": "wave_pr_guard"
-                }));
+        let is_cross_repo = notes.contains("direct_to_main");
+        if !is_cross_repo {
+            let wave_pr: Option<(i64, String)> = conn
+                .query_row(
+                    "SELECT t2.wave_id, t2.notes FROM tasks t1 \
+                     JOIN tasks t2 ON t2.wave_id = t1.wave_id \
+                     WHERE t1.id = ?1 AND t2.id != ?1 \
+                     AND t2.notes LIKE 'https://github.com/%/pull/%' LIMIT 1",
+                    params![body.task_db_id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .ok();
+            if let Some((wave_id, existing)) = wave_pr {
+                let existing_url = existing.split_whitespace().next().unwrap_or(&existing);
+                if !body.pr_url.starts_with(existing_url) {
+                    return Json(json!({
+                        "error": format!("Wave {wave_id} already has PR: {existing_url}. One PR per wave (Learning #25)."),
+                        "step": "wave_pr_guard"
+                    }));
+                }
             }
         }
     }

@@ -29,7 +29,7 @@ pub struct SpecTask {
     pub title: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "assignee")]
     pub executor_agent: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
