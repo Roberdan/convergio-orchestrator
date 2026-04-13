@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.10](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.9...v0.1.10) (2026-04-13)
+
+
+### Features
+
+* pass repo_override to spawner for cross-repo plan execution ([de4c51b](https://github.com/Roberdan/convergio-orchestrator/commit/de4c51b5044329d5ab1d69741c403dce1da67b5d))
+
+
+### Bug Fixes
+
+* pass CARGO_REGISTRY_TOKEN to release workflow ([1be9c73](https://github.com/Roberdan/convergio-orchestrator/commit/1be9c73bbfb1af25b222ee9fd7053e536332e7b3))
+
 ## [0.1.9](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.8...v0.1.9) (2026-04-13)
 
 
