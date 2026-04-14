@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.10...v0.1.11) (2026-04-14)
+
+
+### Features
+
+* remap repo_path for cross-node delegation ([d94a15e](https://github.com/Roberdan/convergio-orchestrator/commit/d94a15e41cbc65577b523fa5380c55f17d306bc4))
+
 ## [0.1.10](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.9...v0.1.10) (2026-04-13)
 
 
