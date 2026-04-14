@@ -141,14 +141,25 @@ async fn spawn_mesh_delegate(
         task.db_id
     );
 
+    // Remap repo_path from local to remote node paths
+    let remote_repo = task
+        .repo_path
+        .as_deref()
+        .and_then(|local| remap_repo_path(local, peer_id));
+
+    let mut body = json!({
+        "agent_name": format!("task-{}-delegate", task.db_id),
+        "instructions": instructions,
+        "peer_id": peer_id,
+    });
+    if let Some(ref rp) = remote_repo {
+        body["repo_override"] = json!(rp);
+    }
+
     let resp = client
         .post(format!("{DAEMON_BASE}/api/delegate/spawn"))
         .header("Authorization", convergio_types::dev_auth_header())
-        .json(&json!({
-            "agent_name": format!("task-{}-delegate", task.db_id),
-            "instructions": instructions,
-            "peer_id": peer_id,
-        }))
+        .json(&body)
         .send()
         .await?;
 
@@ -214,4 +225,111 @@ async fn handle_spawn_response(
     }
 
     Ok(())
+}
+
+/// Remap a local repo_path to the equivalent path on a remote peer.
+///
+/// Uses peers.conf to find repo_path for both local and remote nodes.
+/// Local: /Users/Roberdan/GitHub/Convergio-Repos/convergio-billing
+/// Remote (macProM1): /Users/roberdandev/GitHub/Convergio-Repos/convergio-billing
+///
+/// Logic: find the GitHub base dir from each node's repo_path (parent of convergio/),
+/// then rebase the relative path onto the remote base.
+fn remap_repo_path(local_path: &str, peer_id: &str) -> Option<String> {
+    let conf_path =
+        std::path::PathBuf::from(std::env::var("CONVERGIO_PEERS_CONF").unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            format!("{home}/.claude/config/peers.conf")
+        }));
+    let text = std::fs::read_to_string(&conf_path).ok()?;
+
+    // Find local base: parent of the daemon repo_path
+    // The daemon repo is at <base>/convergio, so base = parent
+    let local_base = find_base_from_config(&text, None)?;
+    let remote_base = find_base_from_config(&text, Some(peer_id))?;
+
+    // Strip local base from local_path, append to remote base
+    let local_path = std::path::Path::new(local_path);
+    let local_base_path = std::path::Path::new(&local_base);
+    let relative = local_path.strip_prefix(local_base_path).ok()?;
+
+    let remote = std::path::Path::new(&remote_base).join(relative);
+    Some(remote.to_string_lossy().to_string())
+}
+
+/// Extract the GitHub base directory from peers.conf for a given peer.
+/// If peer_id is None, finds the local node (by matching hostname).
+fn find_base_from_config(config_text: &str, peer_id: Option<&str>) -> Option<String> {
+    let mut current_section = String::new();
+    let mut current_repo_path: Option<String> = None;
+    let local_hostname = std::process::Command::new("hostname")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    for line in config_text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') && line.ends_with(']') && line != "[mesh]" {
+            // Save previous section if it matched
+            if let Some(ref rp) = current_repo_path {
+                if should_use_section(peer_id, &current_section, &local_hostname, config_text) {
+                    // repo_path points to convergio repo, parent is the base
+                    return std::path::Path::new(rp)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string());
+                }
+            }
+            current_section = line[1..line.len() - 1].to_string();
+            current_repo_path = None;
+        }
+        if let Some(val) = line.strip_prefix("repo_path=") {
+            current_repo_path = Some(val.trim().to_string());
+        }
+    }
+    // Check last section
+    if let Some(ref rp) = current_repo_path {
+        if should_use_section(peer_id, &current_section, &local_hostname, config_text) {
+            return std::path::Path::new(rp)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+fn should_use_section(
+    peer_id: Option<&str>,
+    section: &str,
+    local_hostname: &str,
+    config_text: &str,
+) -> bool {
+    match peer_id {
+        Some(id) => section == id,
+        None => {
+            // Find local node: check aliases for hostname match
+            let section_block = extract_section_block(config_text, section);
+            section_block.contains(local_hostname)
+                || section_block.contains(&local_hostname.replace(".local", ""))
+        }
+    }
+}
+
+fn extract_section_block(config_text: &str, section: &str) -> String {
+    let mut in_section = false;
+    let mut block = String::new();
+    for line in config_text.lines() {
+        let trimmed = line.trim();
+        if trimmed == format!("[{section}]") {
+            in_section = true;
+            continue;
+        }
+        if in_section && trimmed.starts_with('[') {
+            break;
+        }
+        if in_section {
+            block.push_str(trimmed);
+            block.push('\n');
+        }
+    }
+    block
 }
