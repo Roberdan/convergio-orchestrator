@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.12](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.11...v0.1.12) (2026-04-18)
+
+
+### Bug Fixes
+
+* **deps:** bump rustls-webpki 0.103.11 -&gt; 0.103.12 (RUSTSEC-2026-0099) ([e57ead5](https://github.com/Roberdan/convergio-orchestrator/commit/e57ead5ab1d1bb9eb64337510cd9da5ebba326d5))
+* security and quality audit pass 2 ([da50f54](https://github.com/Roberdan/convergio-orchestrator/commit/da50f5459b52a11d1fac0028bfde6aeefd2aee21))
+* security and quality audit pass 2 ([e6cd023](https://github.com/Roberdan/convergio-orchestrator/commit/e6cd023b8ac0a1070182e269bf24b2d8c6659690))
+
 ## [0.1.11](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.10...v0.1.11) (2026-04-14)
 
 
