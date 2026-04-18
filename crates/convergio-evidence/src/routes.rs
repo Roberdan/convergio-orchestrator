@@ -121,7 +121,11 @@ async fn match_commit(
 }
 
 fn err(e: impl std::fmt::Display) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    tracing::error!("evidence route error: {e}");
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "internal server error".to_string(),
+    )
 }
 
 fn ok(v: serde_json::Value) -> Result<Json<serde_json::Value>, (StatusCode, String)> {

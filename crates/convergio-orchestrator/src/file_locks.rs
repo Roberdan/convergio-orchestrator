@@ -42,7 +42,10 @@ struct ReleaseBody {
 async fn acquire_lock(State(pool): State<ConnPool>, Json(body): Json<AcquireBody>) -> Json<Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("lock acquire pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let ttl = body.ttl_secs.unwrap_or(3600);
 
@@ -82,14 +85,20 @@ async fn acquire_lock(State(pool): State<ConnPool>, Json(body): Json<AcquireBody
         params![body.file_path, body.agent_id, ttl],
     ) {
         Ok(_) => Json(json!({"ok": true, "acquired": true})),
-        Err(e) => Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::warn!("lock acquire failed: {e}");
+            Json(json!({"error": "failed to acquire lock"}))
+        }
     }
 }
 
 async fn list_locks(State(pool): State<ConnPool>) -> Json<Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("lock list pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
 
     expire_locks_sync(&conn);
@@ -99,7 +108,10 @@ async fn list_locks(State(pool): State<ConnPool>) -> Json<Value> {
          FROM advisory_locks ORDER BY acquired_at DESC",
     ) {
         Ok(s) => s,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("lock list prepare error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
 
     let rows: Vec<Value> = stmt
@@ -121,7 +133,10 @@ async fn list_locks(State(pool): State<ConnPool>) -> Json<Value> {
 async fn release_lock(State(pool): State<ConnPool>, Json(body): Json<ReleaseBody>) -> Json<Value> {
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("lock release pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
 
     match conn.execute(
@@ -131,7 +146,10 @@ async fn release_lock(State(pool): State<ConnPool>, Json(body): Json<ReleaseBody
     ) {
         Ok(n) if n > 0 => Json(json!({"ok": true, "released": true})),
         Ok(_) => Json(json!({"ok": false, "error": "NOT_FOUND"})),
-        Err(e) => Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::warn!("lock release failed: {e}");
+            Json(json!({"error": "failed to release lock"}))
+        }
     }
 }
 

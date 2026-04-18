@@ -47,14 +47,20 @@ async fn handle_task_history(
 ) -> Json<serde_json::Value> {
     let conn = match state.pool.get() {
         Ok(c) => c,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("audit history pool error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let mut stmt = match conn.prepare(
         "SELECT id, old_status, new_status, agent, notes, created_at \
          FROM task_status_log WHERE task_id = ?1 ORDER BY id",
     ) {
         Ok(s) => s,
-        Err(e) => return Json(json!({"error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("audit history prepare error: {e}");
+            return Json(json!({"error": "internal server error"}));
+        }
     };
     let rows: Vec<serde_json::Value> = stmt
         .query_map(params![task_id], |r| {

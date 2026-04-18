@@ -75,29 +75,26 @@ pub fn list_evaluations(
     plan_id: Option<i64>,
     limit: u32,
 ) -> Vec<PlanEvaluation> {
-    let (sql, p): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match plan_id {
+    let clamped_limit = limit.min(1000) as i64;
+    let (sql, p): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = match plan_id {
         Some(pid) => (
-            format!(
-                "SELECT id,plan_id,evaluator,tasks_total,tasks_completed,\
-                 tasks_failed,false_positives,false_negatives,precision_score,\
-                 recall_score,f1_score,total_cost_usd,total_duration_secs,\
-                 evaluated_at FROM plan_evaluations \
-                 WHERE plan_id=?1 ORDER BY evaluated_at DESC LIMIT {limit}"
-            ),
-            vec![Box::new(pid)],
+            "SELECT id,plan_id,evaluator,tasks_total,tasks_completed,\
+             tasks_failed,false_positives,false_negatives,precision_score,\
+             recall_score,f1_score,total_cost_usd,total_duration_secs,\
+             evaluated_at FROM plan_evaluations \
+             WHERE plan_id=?1 ORDER BY evaluated_at DESC LIMIT ?2",
+            vec![Box::new(pid), Box::new(clamped_limit)],
         ),
         None => (
-            format!(
-                "SELECT id,plan_id,evaluator,tasks_total,tasks_completed,\
-                 tasks_failed,false_positives,false_negatives,precision_score,\
-                 recall_score,f1_score,total_cost_usd,total_duration_secs,\
-                 evaluated_at FROM plan_evaluations \
-                 ORDER BY evaluated_at DESC LIMIT {limit}"
-            ),
-            vec![],
+            "SELECT id,plan_id,evaluator,tasks_total,tasks_completed,\
+             tasks_failed,false_positives,false_negatives,precision_score,\
+             recall_score,f1_score,total_cost_usd,total_duration_secs,\
+             evaluated_at FROM plan_evaluations \
+             ORDER BY evaluated_at DESC LIMIT ?1",
+            vec![Box::new(clamped_limit)],
         ),
     };
-    let mut stmt = match conn.prepare(&sql) {
+    let mut stmt = match conn.prepare(sql) {
         Ok(s) => s,
         Err(_) => return vec![],
     };

@@ -89,7 +89,13 @@ pub fn run_all_gates(
             run_checklist_gate(conn, task_id)?;
             run_validator_gate(conn, task_id)
         }
-        _ => Ok(()),
+        _ => Err(GateViolation {
+            gate: "EvidenceGates".into(),
+            task_id,
+            detail: format!(
+                "unknown target status '{target_status}' — only 'submitted' and 'done' are gated"
+            ),
+        }),
     }
 }
 
@@ -185,8 +191,9 @@ mod tests {
     }
 
     #[test]
-    fn run_all_gates_pending_always_passes() {
+    fn run_all_gates_pending_rejects_unknown_status() {
         let conn = setup();
-        assert!(run_all_gates(&conn, 1, "pending").is_ok());
+        assert!(run_all_gates(&conn, 1, "pending").is_err());
+        assert!(run_all_gates(&conn, 1, "bogus").is_err());
     }
 }

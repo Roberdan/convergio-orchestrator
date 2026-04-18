@@ -133,8 +133,12 @@ impl Extension for OrchestratorExtension {
     fn on_start(&self, ctx: &AppContext) -> ExtResult<()> {
         // Self-heal: ensure columns exist even if migration registry drifted
         if let Ok(conn) = self.pool.get() {
-            let _ = crate::schema::ensure_required_capabilities_column(&conn);
-            let _ = crate::schema::ensure_claimed_files_column(&conn);
+            if let Err(e) = crate::schema::ensure_required_capabilities_column(&conn) {
+                tracing::warn!("schema self-heal (capabilities): {e}");
+            }
+            if let Err(e) = crate::schema::ensure_claimed_files_column(&conn) {
+                tracing::warn!("schema self-heal (claimed_files): {e}");
+            }
         }
         tracing::info!("orchestrator: starting reactor, validator, reaper");
 
@@ -183,9 +187,12 @@ impl Extension for OrchestratorExtension {
                     }
                 }
             }
-            Err(e) => Health::Down {
-                reason: format!("pool error: {e}"),
-            },
+            Err(e) => {
+                tracing::error!("orchestrator health check pool error: {e}");
+                Health::Down {
+                    reason: "database pool unavailable".into(),
+                }
+            }
         }
     }
 
