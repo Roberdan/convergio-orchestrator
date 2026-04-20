@@ -158,6 +158,9 @@ impl Extension for OrchestratorExtension {
         // Spawn reaper
         crate::reaper::spawn_reaper(self.pool.clone());
 
+        // Spawn plan zombie reaper (closes stale plans, repairs done-with-open-tasks)
+        crate::plan_zombie_reaper::spawn_plan_zombie_reaper(self.pool.clone());
+
         // Spawn autonomous plan executor loop (Plan Zero W2)
         crate::plan_executor::spawn_plan_executor_loop(self.pool.clone());
 
