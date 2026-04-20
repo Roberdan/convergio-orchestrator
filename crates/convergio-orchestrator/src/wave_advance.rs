@@ -9,6 +9,9 @@ pub(crate) fn advance_completed_waves(pool: &ConnPool) {
     // A wave only advances to `done` when every task is in a terminal
     // state (done | submitted | cancelled | skipped). `failed` must not
     // pass silently — it would let a broken wave promote its plan.
+    // Empty waves (no tasks at all, e.g. doc-only waves from plan_import_core)
+    // are allowed to auto-advance: they trivially have no open work. Without
+    // this, an in_progress empty wave would deadlock its plan.
     let waves_done = conn
         .execute(
             "UPDATE waves SET status = 'done', updated_at = datetime('now') \
@@ -16,9 +19,6 @@ pub(crate) fn advance_completed_waves(pool: &ConnPool) {
              AND NOT EXISTS ( \
                SELECT 1 FROM tasks WHERE wave_id = waves.id \
                AND status NOT IN ('done', 'submitted', 'cancelled', 'skipped') \
-             ) \
-             AND EXISTS ( \
-               SELECT 1 FROM tasks WHERE wave_id = waves.id \
              )",
             [],
         )
