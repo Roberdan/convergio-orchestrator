@@ -128,6 +128,16 @@ async fn test_plan_lifecycle_with_thor_review() {
     let body = json_body(resp).await;
     assert_eq!(body["status"], "in_progress");
 
+    // Mark every task terminal so the plan-close integrity guard allows done.
+    {
+        let conn = pool.get().unwrap();
+        conn.execute(
+            "UPDATE tasks SET status = 'done' WHERE plan_id = ?1",
+            params![plan_id],
+        )
+        .unwrap();
+    }
+
     // Complete the plan
     let resp = app(&state)
         .oneshot(
