@@ -47,6 +47,7 @@ pub mod plan_routes_ext;
 pub mod plan_sequencer;
 pub mod plan_state;
 pub mod plan_validate;
+pub mod plan_zombie_reaper;
 pub mod pm_routes;
 pub mod policy;
 pub mod pr_dependencies;
