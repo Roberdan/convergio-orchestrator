@@ -131,10 +131,16 @@ async fn test_complete_plan() {
     let plan_id = json_body(resp).await["id"].as_i64().unwrap();
 
     // Must transition through in_progress before completing (FSM enforced)
+    // and every task must be terminal (PlanCloseIntegrity guard).
     {
         let conn = state.pool.get().unwrap();
         conn.execute(
             "UPDATE plans SET status = 'in_progress' WHERE id = ?1",
+            rusqlite::params![plan_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tasks (plan_id, title, status) VALUES (?1, 'seed', 'done')",
             rusqlite::params![plan_id],
         )
         .unwrap();

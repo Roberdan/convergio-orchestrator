@@ -219,6 +219,19 @@ fn set_plan_status(pool: &ConnPool, plan_id: i64, status: &str) -> serde_json::V
     if let Err(reason) = crate::plan_state::validate_plan_transition(&current, status) {
         return json!({"error": reason, "current_status": current, "requested_status": status});
     }
+    if status == "done" {
+        match crate::plan_integrity::describe_close_blockers(&conn, plan_id) {
+            Ok(Some(msg)) => {
+                return json!({
+                    "error": format!("cannot close plan: {msg}"),
+                    "gate": "PlanCloseIntegrity",
+                    "current_status": current,
+                });
+            }
+            Err(e) => return json!({"error": e.to_string()}),
+            Ok(None) => {}
+        }
+    }
     match conn.execute(
         "UPDATE plans SET status = ?1, updated_at = datetime('now') WHERE id = ?2",
         params![status, plan_id],

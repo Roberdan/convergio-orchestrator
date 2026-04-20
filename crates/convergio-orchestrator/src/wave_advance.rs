@@ -6,13 +6,19 @@ use convergio_db::pool::ConnPool;
 /// Also mark plans as done only when ALL waves are done (#875).
 pub(crate) fn advance_completed_waves(pool: &ConnPool) {
     let Ok(conn) = pool.get() else { return };
+    // A wave only advances to `done` when every task is in a terminal
+    // state (done | submitted | cancelled | skipped). `failed` must not
+    // pass silently — it would let a broken wave promote its plan.
     let waves_done = conn
         .execute(
             "UPDATE waves SET status = 'done', updated_at = datetime('now') \
              WHERE status = 'in_progress' \
              AND NOT EXISTS ( \
                SELECT 1 FROM tasks WHERE wave_id = waves.id \
-               AND status IN ('pending', 'in_progress', 'submitted') \
+               AND status NOT IN ('done', 'submitted', 'cancelled', 'skipped') \
+             ) \
+             AND EXISTS ( \
+               SELECT 1 FROM tasks WHERE wave_id = waves.id \
              )",
             [],
         )
@@ -35,21 +41,23 @@ pub(crate) fn advance_completed_waves(pool: &ConnPool) {
          )",
         [],
     );
-    // Mark plans as done when ALL waves are done (#875)
-    let plans_done = conn
-        .execute(
-            "UPDATE plans SET status = 'done', updated_at = datetime('now') \
-             WHERE status = 'in_progress' \
-             AND NOT EXISTS ( \
-               SELECT 1 FROM waves WHERE plan_id = plans.id \
-               AND status NOT IN ('done', 'cancelled') \
-             ) \
-             AND EXISTS ( \
-               SELECT 1 FROM waves WHERE plan_id = plans.id AND status = 'done' \
-             )",
-            [],
-        )
-        .unwrap_or(0);
+    // Mark plans as done when ALL waves are done (#875) AND every task on
+    // the plan is terminal — guards against auto-promoting a plan while real
+    // work is still open (see plan_integrity for the rationale).
+    let plans_done_sql = format!(
+        "UPDATE plans SET status = 'done', updated_at = datetime('now') \
+         WHERE status = 'in_progress' \
+         AND NOT EXISTS ( \
+           SELECT 1 FROM waves WHERE plan_id = plans.id \
+           AND status NOT IN ('done', 'cancelled') \
+         ) \
+         AND EXISTS ( \
+           SELECT 1 FROM waves WHERE plan_id = plans.id AND status = 'done' \
+         ) \
+         AND {clause}",
+        clause = crate::plan_integrity::PLAN_TASKS_ALL_TERMINAL_SQL,
+    );
+    let plans_done = conn.execute(&plans_done_sql, []).unwrap_or(0);
     if plans_done > 0 {
         tracing::info!("plan_executor: {plans_done} plan(s) completed (all waves done)");
     }
