@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.14](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.13...v0.1.14) (2026-04-20)
+
+
+### Features
+
+* **orchestrator:** add plan_zombie_reaper — close stale plans on a 6h cron ([2fdf8b7](https://github.com/Roberdan/convergio-orchestrator/commit/2fdf8b73df1f6552afd0df008186346338011e62))
+
+
+### Bug Fixes
+
+* **plan-close:** block done transition unless every task is terminal ([6d80eda](https://github.com/Roberdan/convergio-orchestrator/commit/6d80edaf3aefc536ed65c2f90c0957e00beb65e8))
+
 ## [0.1.13](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.12...v0.1.13) (2026-04-18)
 
 
