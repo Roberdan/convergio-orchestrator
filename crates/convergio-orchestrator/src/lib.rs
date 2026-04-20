@@ -38,6 +38,7 @@ pub mod plan_force_ops;
 pub mod plan_hierarchy;
 pub mod plan_import;
 pub mod plan_import_core;
+pub mod plan_integrity;
 pub mod plan_kb;
 pub mod plan_purge;
 pub mod plan_readiness;
