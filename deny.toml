@@ -6,6 +6,16 @@ all-features = true
 
 [advisories]
 version = 2
+# rustls-webpki name-constraints verification bugs. Affect rustls-webpki
+# up to and including 0.103.12 (the latest stable as of 2026-04-21); the
+# only fix line is 0.104.0-alpha.* which is not shipping-ready. Our
+# daemon-to-daemon paths use pinned HMAC + tailscale mesh, not raw TLS
+# against untrusted chains, so operational impact is low. Remove once
+# cargo resolves to a stable 0.104.x.
+ignore = [
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+]
 
 [licenses]
 version = 2
