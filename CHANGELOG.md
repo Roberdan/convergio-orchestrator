@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.14...v0.1.15) (2026-04-21)
+
+
+### Bug Fixes
+
+* **orchestrator:** address codex-bot reviews from [#28](https://github.com/Roberdan/convergio-orchestrator/issues/28) and [#29](https://github.com/Roberdan/convergio-orchestrator/issues/29) ([8d2c05b](https://github.com/Roberdan/convergio-orchestrator/commit/8d2c05bb87f2d457326ba2ababcb8baffb4f2c4d))
+
 ## [0.1.14](https://github.com/Roberdan/convergio-orchestrator/compare/v0.1.13...v0.1.14) (2026-04-20)
 
 
