@@ -40,9 +40,11 @@ pub fn reap_zombie_plans(pool: &ConnPool) -> Result<ZombieReapOutcome, rusqlite:
         .get()
         .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
 
+    // `active` is a legacy alias for `in_progress` still found in
+    // mixed-version data (PlanStatus::from_str accepts both). Reap both.
     let failed_inprogress = conn.execute(
         "UPDATE plans SET status='failed', updated_at=datetime('now') \
-         WHERE status='in_progress' \
+         WHERE status IN ('in_progress','active') \
          AND updated_at < datetime('now', ?1)",
         params![format!("-{STALE_IN_PROGRESS_DAYS} days")],
     )?;
@@ -131,6 +133,23 @@ mod tests {
         assert_eq!(outcome.failed_inprogress, 1);
         assert_eq!(outcome.cancelled_paused, 0);
         assert_eq!(outcome.repaired_done, 0);
+    }
+
+    #[test]
+    fn stale_active_alias_is_reaped() {
+        let pool = setup();
+        {
+            let conn = pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO plans(id, status, updated_at) VALUES \
+                 (1,'active',datetime('now','-8 days')), \
+                 (2,'active',datetime('now','-1 days'))",
+                [],
+            )
+            .unwrap();
+        }
+        let outcome = reap_zombie_plans(&pool).unwrap();
+        assert_eq!(outcome.failed_inprogress, 1);
     }
 
     #[test]
