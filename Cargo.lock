@@ -279,9 +279,9 @@ dependencies = [
 
 [[package]]
 name = "convergio-ceo"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c327e55f13f8a6dbd6ab36c239bab89d661f640c1c41eaafd90d8fde4537b577"
+checksum = "6833a415513623d9bf629dad4473a7288d703143a2f7339cadfc91014e7af880"
 dependencies = [
  "axum",
  "convergio-db",
